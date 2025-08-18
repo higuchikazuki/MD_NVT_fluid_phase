@@ -9,45 +9,45 @@ program fluid_phase
   implicit none
   integer(selected_int_kind(9)), parameter :: i4b = selected_int_kind(9), &
   & wp = selected_real_kind(15)
-  integer(i4b), parameter :: N=500, N1=35
+  integer(i4b), parameter :: N=500, N1=25
   integer(i4b)::i,i3,j3,j,ndiv,i5,j5,i2,seedsize,i4,err
   integer,allocatable:: seed(:)
-  real(wp) :: position(3,N), momentum(3,N), zeta, dt, Q, g, instant_kbT,kbT, t, L, av_momentum(3),rho,c,V,&
+  real(wp) :: position(3,N), momentum(3,N), zeta, dt, Q, g, instant_kbT,kbT0, t, L, av_momentum(3),rho,c,V,&
   & position_Ein(3,N), theta(4), spring_constant, square_displacement_ave(N), displacement(3,N),delta_r,gr_dash(100),&
   & lambda1,lambda2,x(N1),w(N1),f(N1), lambda, free_energy, free_energy_, spring_constant_array(N), pressure,&
   & sigma_ln, delta_total_potential_ave, delta_total_potential, integration_potential, delta_lambda,swiching_potential,&
   & elastic_energy_ave,virial_int,virial_int_EIn,param(7), momentum0(3,N), relative_pos, data_potential_force(3,2),&
   & free_energy_fluid, free_energy_ideal, pressure_ave, delta_rho, integrand, L_before, fitting_param_p(8), delta_instant_kbT,&
-  & potential_average
+  & potential_ave
   real(wp), parameter :: pi = 4*atan(1._wp)
   logical, parameter :: test_run = .false.
 
-  open(11,file='data.dat')
-  open(12,file='position.dat')
-  open(13,file='momentum.dat')
+  open(11,file='data_rho=0.4.dat')
+  open(12,file='position_rho=0.4.dat')
+  open(13,file='momentum_rho=0.4.dat')
   open(14,file='position_Ein.dat')
-  open(15,file='RDF.dat')
+  open(15,file='RDF_rho=0.4.dat')
   open(16,file='spring_constant.dat')
-  open(17,file='data2.dat')
+  open(17,file='data2_rho=0.4.dat')
   open(18,file='data_free_energy.dat')
   open(19,file='data3.dat')
-  open(20,file='RDF_first.dat')
+  open(20,file='RDF_first_rho=0.4.dat')
   open(21,file='force.dat')
   open(22,file='force_first.dat')
   open(23,file='paramater.dat')
   open(24,file='DLVO_potential.dat')
-  open(25,file='integrand.dat')
+  open(25,file='integrand_rho=0.4.dat')
   open(26,file='data_DLVO_ptential_maxmin.dat')
   open(27,file='data_DLVO_force_max.dat')
-  open(28,file='position_first.dat')
+  open(28,file='position_first_rho=0.4.dat')
 
-  rho=0.05_wp
+  rho=0.4_wp
   V = N/rho
   L = V**(1._wp/3)
   Q=1.0
   dt=0.001
   g=3*N
-  instant_kbT=5.0
+  kbT0=5.0
   ndiv=100
   delta_r=0.0375
   theta = (/0.270833, 203.2973301, 0.0735297, 1.00/)
@@ -57,12 +57,12 @@ program fluid_phase
   fitting_param_p = (/-2433.43, -37028.6, 83367.8, -71102.9, 31893.7, -7731.52, 1181.56, -80.1666/)
   data_potential_force(1:2,1:2) = get_DLVO_potential_maxmin(theta)
   data_potential_force(3,1:2) = get_DLVO_force_maximal(theta)
-  free_energy_ideal = instant_kbT*rho*(log(rho)-1)
+  free_energy_ideal = kbT0*rho*(log(rho)-1)
   free_energy = free_energy_ideal
   position_Ein = get_fcc_coordinates(N)*sqrt(2._wp)*1.836
   position = position_Ein
   pressure_ave=0.0
-  delta_rho=0.025_wp
+  delta_rho=0.018_wp
   delta_instant_kbT=0.01_wp
 
   write(23,'(7g18.8)') param
@@ -112,7 +112,7 @@ program fluid_phase
   do i=1,N
     momentum0(:,i)=momentum0(:,i)-av_momentum
   enddo
-  kbT = (1/g)*(sum(momentum0**2))
+  instant_kbT = (1/g)*(sum(momentum0**2))
   momentum = momentum0
   ! c=(0.5/kbT)**0.5
   ! momentum0=c*momentum0
@@ -132,15 +132,15 @@ program fluid_phase
     else where(position>=L)
       position=position-L
     endwhere
-    zeta=zeta+ (1/Q)*(sum(momentum**2)-g*instant_kbT)*dt
+    zeta=zeta+ (1/Q)*(sum(momentum**2)-g*kbT0)*dt
     momentum = momentum+ force(theta,param,L,N,position)*dt/2
     ! write(22,*) force(theta,param,L,N,position)
     momentum = momentum*exp(-zeta*dt/2)
     t=i*dt
 
     if(mod(i,250)==0)then
-      kbT = (1/g)*(sum(momentum**2))
-      write (11,'(5g18.8)') t, kbT,V,total_potential(theta,param,N,position,L),instantaneous_P(theta,param,N,L,V,position,momentum)
+      instant_kbT = (1/g)*(sum(momentum**2))
+      write (11,'(5g18.8)') t, instant_kbT,V,total_potential(theta,param,N,position,L),instantaneous_P(theta,param,N,L,V,position,momentum)
     endif
 
     if(mod(i,1000)==0)then
@@ -156,71 +156,12 @@ program fluid_phase
   write (12,*) position
   write (13,*) momentum
 
-  instant_kbT = 4.0
-  do i4 = 1,N1
-
-    pressure_ave = 0.0
-    L_before = L
-
-
-    do i =0,50000
-      momentum = momentum*exp(-zeta*dt/2)
-      momentum = momentum+force(theta,param,L,N,position)*dt/2
-      position = position +momentum*dt
-      where(position<0)
-        position=position+L
-      else where(position>=L)
-        position=position-L
-      endwhere
-      zeta=zeta+ (1/Q)*(sum(momentum**2)-g*instant_kbT)*dt
-      momentum = momentum+ force(theta,param,L,N,position)*dt/2
-      momentum = momentum*exp(-zeta*dt/2)
-      t=i*dt
-
-      if(mod(i,500)==0)then
-        kbT = (1/g)*(sum(momentum**2))
-        write (17,'(6g18.8)') t, kbT,V,L,total_potential(theta,param,N,position,L),instantaneous_P(theta,param,N,L,V,position,momentum)
-      endif
-
-      if(mod(i,5000)==0)then
-        gr_dash = RDF(L, position, delta_r, N, V, ndiv)
-        do j = 1 , ndiv
-          write (15,*) j*delta_r , gr_dash(j)
-        end do
-        write (15,'(/)')
-      end if
-
-      if ( i>25000 ) then
-        if (mod(i,50) == 0) then
-          pressure_ave = pressure_ave + instantaneous_P(theta,param,N,L,V,position,momentum)
-        end if
-      endif
-
-    enddo
-
-    pressure_ave = pressure_ave/500
-    integrand = (pressure_ave - instant_kbT*rho)/(rho**2)
-    free_energy = free_energy + integrand*delta_rho
-
-    write(25,'(5g18.8)') rho, free_energy, integrand, pressure_ave, i4
-
-    write (12,*) position
-    write (13,*) momentum
-    write (12,'(/)')
-    write (13,'(/)')
-    write (15,'(/)')
-    write (17,'(/)')
-
-    rho = rho + delta_rho
-    V = N/rho
-    L = V**(1._wp/3)
-    position = position*(L/L_before)
-
-  end do
-
+  kbT0 = 3.0
   ! do i4 = 1,N1
 
-  !     potential_ave = 0.0
+  !   pressure_ave = 0.0
+  !   L_before = L
+
 
   !   do i =0,50000
   !     momentum = momentum*exp(-zeta*dt/2)
@@ -231,14 +172,14 @@ program fluid_phase
   !     else where(position>=L)
   !       position=position-L
   !     endwhere
-  !     zeta=zeta+ (1/Q)*(sum(momentum**2)-g*instant_kbT)*dt
+  !     zeta=zeta+ (1/Q)*(sum(momentum**2)-g*kbT0)*dt
   !     momentum = momentum+ force(theta,param,L,N,position)*dt/2
   !     momentum = momentum*exp(-zeta*dt/2)
   !     t=i*dt
 
   !     if(mod(i,500)==0)then
-  !       kbT = (1/g)*(sum(momentum**2))
-  !       write (17,'(5g18.8)') t, kbT,V,total_potential(theta,param,N,position,L),instantaneous_P(theta,param,N,L,V,position,momentum)
+  !       instant_kbT = (1/g)*(sum(momentum**2))
+  !       write (17,'(6g18.8)') t, instant_kbT,V,L,total_potential(theta,param,N,position,L),instantaneous_P(theta,param,N,L,V,position,momentum)
   !     endif
 
   !     if(mod(i,5000)==0)then
@@ -251,17 +192,17 @@ program fluid_phase
 
   !     if ( i>25000 ) then
   !       if (mod(i,50) == 0) then
-  !         potential_ave = potential_ave + total_potential(theta,param,N,position,L)
+  !         pressure_ave = pressure_ave + instantaneous_P(theta,param,N,L,V,position,momentum)
   !       end if
   !     endif
 
   !   enddo
 
-  !   potential_ave = potential_ave/500
-  !   ! integrand = (pressure_ave - instant_kbT*rho)/(rho**2)
-  !   ! free_energy = free_energy + integrand*delta_rho
+  !   pressure_ave = pressure_ave/500
+  !   integrand = (pressure_ave - kbT0*rho)/(rho**2)
+  !   free_energy = free_energy + integrand*delta_rho
 
-  !   write(25,'(2g18.8)') instant_kbT, potential_ave
+  !   write(25,'(5g18.8)') rho, free_energy, integrand, pressure_ave, i4
 
   !   write (12,*) position
   !   write (13,*) momentum
@@ -270,9 +211,68 @@ program fluid_phase
   !   write (15,'(/)')
   !   write (17,'(/)')
 
-  !   instant_kbT = instant_kbT - delta_instant_kbT
+  !   rho = rho + delta_rho
+  !   V = N/rho
+  !   L = V**(1._wp/3)
+  !   position = position*(L/L_before)
 
   ! end do
+
+  do i4 = 1,N1
+
+    potential_ave = 0.0
+
+    do i =0,50000
+      momentum = momentum*exp(-zeta*dt/2)
+      momentum = momentum+force(theta,param,L,N,position)*dt/2
+      position = position +momentum*dt
+      where(position<0)
+        position=position+L
+      else where(position>=L)
+        position=position-L
+      endwhere
+      zeta=zeta+ (1/Q)*(sum(momentum**2)-g*kbT0)*dt
+      momentum = momentum+ force(theta,param,L,N,position)*dt/2
+      momentum = momentum*exp(-zeta*dt/2)
+      t=i*dt
+
+      if(mod(i,500)==0)then
+        instant_kbT = (1/g)*(sum(momentum**2))
+        write (17,'(6g18.8)') t, instant_kbT,V,L,total_potential(theta,param,N,position,L),instantaneous_P(theta,param,N,L,V,position,momentum)
+      endif
+
+      if(mod(i,5000)==0)then
+        gr_dash = RDF(L, position, delta_r, N, V, ndiv)
+        do j = 1 , ndiv
+          write (15,*) j*delta_r , gr_dash(j)
+        end do
+        write (15,'(/)')
+      end if
+
+      if ( i>25000 ) then
+        if (mod(i,50) == 0) then
+          potential_ave = potential_ave + total_potential(theta,param,N,position,L)
+        end if
+      endif
+
+    enddo
+
+    potential_ave = potential_ave/500
+    ! integrand = (pressure_ave - kbT0*rho)/(rho**2)
+    ! free_energy = free_energy + integrand*delta_rho
+
+    write(25,'(4g18.8)') kbT0, potential_ave, potential_ave/V, i
+
+    write (12,*) position
+    write (13,*) momentum
+    write (12,'(/)')
+    write (13,'(/)')
+    write (15,'(/)')
+    write (17,'(/)')
+
+    kbT0 = kbT0 - delta_instant_kbT
+
+  end do
 
 end program fluid_phase
 
