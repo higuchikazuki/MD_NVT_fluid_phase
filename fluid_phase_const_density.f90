@@ -1,4 +1,4 @@
-program fluid_phase
+program fluid_phase_const_density
   use mod_create_fcc,only:get_fcc_coordinates
   use mod_rel_pos
   use mod_force
@@ -216,5 +216,5 @@ program fluid_phase
 
   end do
 
-end program fluid_phase
+end program fluid_phase_const_density
 
